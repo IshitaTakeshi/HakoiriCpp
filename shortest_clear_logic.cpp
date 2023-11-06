@@ -8,9 +8,9 @@
 #include "puzzle/graph_logic.hpp"
 
 
-std::size_t to_hash(const Matrix54i &simple_puzzle)
+size_t to_hash(const Matrix54i &simple_puzzle)
 {
-    std::size_t hash;
+    size_t hash;
     int rows = simple_puzzle.rows();
     int cols = simple_puzzle.cols();
 
@@ -25,36 +25,36 @@ std::size_t to_hash(const Matrix54i &simple_puzzle)
     return hash;
 }
 
+size_t hash_simplified_board(const Matrix54i & board) {
+  return to_hash(board_simple(board));
+}
+
 void dikstrqueue(
     const int i,
-    const Matrix54i &now_puzzle,
-    const std::vector<Matrix54i> &movable,
-    comparative_index &puzzle_index,
-    HashNodeMap &edges,
+    const Matrix54i & now_puzzle,
+    std::unordered_set<size_t> & simplified_board_hashes,
+    HashNodeMap &hash_node_map,
     std::vector<Node> &clear_nodes,
-    std::queue<Matrix54i> &puzzle_list,
-    std::vector<Matrix54i> &matrix_index)
+    std::queue<Matrix54i> &puzzle_list)
 {
-  const Node now = edges.at(to_hash(board_simple(now_puzzle)));
+  const Node now = hash_node_map.at(hash_simplified_board(now_puzzle));
 
-  for (const Matrix54i &state : movable)
-  {
-    const Matrix54i state_simple = board_simple(state);
-    const size_t hash_value = to_hash(state_simple);
+  for (const Matrix54i &board : moved_board_list(now_puzzle)) {
+    const size_t hash_value = hash_simplified_board(board);
 
-    if (puzzle_index.find(hash_value) != puzzle_index.end()) {
-      edges.at(hash_value).side_node.push_back(now);
+    if (simplified_board_hashes.find(hash_value) != simplified_board_hashes.end()) {
+      // TODO compare cost and overwrite if it is less than existing
+      hash_node_map.at(hash_value).side_node.push_back(now);
       continue;
     }
 
-    matrix_index.push_back(state);
-    const Node new_node{matrix_index.size() - 1, i, std::vector<Node>{now}};
-    edges[hash_value] = new_node;
-    puzzle_index.insert(hash_value);
-    puzzle_list.push(state);
+    const Node new_node{board, i, std::vector<Node>{now}};
+    hash_node_map[hash_value] = new_node;
 
-    if (clear(state))
-    {
+    simplified_board_hashes.insert(hash_value);
+    puzzle_list.push(board);
+
+    if (clear(board)) {
       clear_nodes.push_back(new_node);
     }
   }
@@ -111,36 +111,32 @@ std::vector<Node> shortestroute_find_dikstr(const std::vector<Node> & clear_node
   return shortest_route;
 }
 
-std::vector<Node> breadth_first_search_dikstr(const Matrix54i &puzzle, std::vector<Matrix54i> &matrix_index)
+std::vector<Node> breadth_first_search_dikstr(const Matrix54i &puzzle)
 {
-    HashNodeMap edges;
-    comparative_index puzzle_index;
+    HashNodeMap hash_node_map;
+    std::unordered_set<size_t> simplified_board_hashes;
     std::queue<Matrix54i> puzzle_list;
     std::vector<Node> clear_nodes;
-    // dequeに初期盤面を追加
-    puzzle_list.push(puzzle);
-    // puzzleを複製
-    // puzzleを比較するための形にする
-    const Matrix54i simple_puzzle = board_simple(puzzle);
 
-    matrix_index.push_back(puzzle);
-    const size_t hash = to_hash(simple_puzzle);
-    edges[hash] = Node{matrix_index.size() - 1, 0, std::vector<Node>{}};
-    puzzle_index.insert(hash);
+    puzzle_list.push(puzzle);
+
+    const size_t hash = hash_simplified_board(puzzle);
+    hash_node_map[hash] = Node{puzzle, 0, std::vector<Node>{}};
+
+    simplified_board_hashes.insert(hash);
 
     int i = 0;
     while (!puzzle_list.empty())
     {
         const Matrix54i now_puzzle = puzzle_list.front();
         puzzle_list.pop();
-        std::vector<Matrix54i> movable = moved_board_list(now_puzzle);
         i++;
-        dikstrqueue(i, now_puzzle, movable,
-                    puzzle_index, edges, clear_nodes, puzzle_list, matrix_index);
+        dikstrqueue(i, now_puzzle,
+                    simplified_board_hashes, hash_node_map, clear_nodes, puzzle_list);
     }
 
     const std::vector<Node> s = shortestroute_find_dikstr(clear_nodes);
-    std::cout << "総手数は" << puzzle_index.size() << "手です" << std::endl;
+    std::cout << "総手数は" << simplified_board_hashes.size() << "手です" << std::endl;
     std::cout << "クリアルートは" << s.size() << "手です" << std::endl;
     return s;
 }

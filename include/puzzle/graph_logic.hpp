@@ -33,15 +33,14 @@ struct KeyEqual
 
 struct Node
 {
-  int puzzle;
+  Matrix54i puzzle;
   int cost;
   std::vector<Node> side_node;
 };
 
-using comparative_index = std::unordered_set<size_t>;
 using HashNodeMap = std::unordered_map<size_t, Node>;
 
-bool isvalue_already(const comparative_index &puzzle_index, const std::string &hash_puzzle);
+bool isvalue_already(const std::unordered_set<size_t> &puzzle_index, const std::string &hash_puzzle);
 bool clear(const Matrix54i &puzzle);
 Matrix54i num_simple(const Matrix54i &puzzle, const int i);
 Matrix54i board_simple(const Matrix54i &puzzle);
@@ -92,13 +91,13 @@ std::vector<Matrix54i> fastclearroute(std::unordered_map<Matrix54i, std::vector<
                                       const Matrix54i moved_puzzle);
 
 Node find_shortest_path(Node &now_node);
-std::vector<Node> breadth_first_search_dikstr(const Matrix54i &puzzle, std::vector<Matrix54i> &matrix_index);
+std::vector<Node> breadth_first_search_dikstr(const Matrix54i &puzzle);
 void dikstrqueue(
     int &count_matrix,
     const int i,
     const Matrix54i &now_puzzle,
     const std::vector<Matrix54i> &movable,
-    comparative_index &puzzle_index,
+    std::unordered_set<size_t> &puzzle_index,
     HashNodeMap &edges,
     std::vector<Node> &clear_nodes,
     std::queue<Matrix54i> &puzzle_list,
