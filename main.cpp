@@ -13,12 +13,11 @@ int main()
 {
     Matrix54i puzzle = init_puzzle();
     std::vector<Matrix54i> matrix_index;
-    std::vector<std::vector<node>> route = breadth_first_search_dikstr(puzzle,matrix_index);
-    std::vector<node> min = shortestroute_find_dikstr(route);
+    const std::vector<Node> min = breadth_first_search_dikstr(puzzle, matrix_index);
 
     std::ofstream myfile;
     myfile.open("example.csv");
-    for (node &n : min)
+    for (const Node & n : min)
     {
         std::string one_colmn = mat_to_str_pluscomma(matrix_index[n.puzzle]);
         one_colmn.pop_back();

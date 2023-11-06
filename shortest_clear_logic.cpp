@@ -8,8 +8,6 @@
 #include "puzzle/graph_logic.hpp"
 
 
-
-
 std::size_t to_hash(const Matrix54i &simple_puzzle)
 {
     std::size_t hash;
@@ -27,157 +25,122 @@ std::size_t to_hash(const Matrix54i &simple_puzzle)
     return hash;
 }
 
-bool isvalue_already(const comparative_index &puzzle_index, const size_t &hash_puzzle)
-{
-    auto it = puzzle_index.find(hash_puzzle);
-    return it != puzzle_index.end();
-}
-
-void make_newnode(const int &count_matrix, const int i, node &new_node, const node &now)
-{
-    new_node.puzzle = count_matrix;
-    new_node.cost = i;
-    new_node.side_node.push_back(now);
-}
-
 void dikstrqueue(
-    int &count_matrix,
     const int i,
     const Matrix54i &now_puzzle,
     const std::vector<Matrix54i> &movable,
     comparative_index &puzzle_index,
-    node_index &edges,
-    std::vector<node> &clear_nodes,
+    HashNodeMap &edges,
+    std::vector<Node> &clear_nodes,
     std::queue<Matrix54i> &puzzle_list,
     std::vector<Matrix54i> &matrix_index)
 {
-    Matrix54i copy_now_puzzle = now_puzzle;
-    Matrix54i now_simple = board_simple(copy_now_puzzle);
-    node now = edges.at(now_simple);
+  const Node now = edges.at(to_hash(board_simple(now_puzzle)));
 
-    for (const Matrix54i &state : movable)
-    {
-        Matrix54i state_copy = state;
-        Matrix54i state_simple = board_simple(state_copy);
-        std::string hash_puzzle = mat_to_str(state_simple);
-        std::hash<std::string> hash_fn;
-        size_t hash_value = hash_fn(hash_puzzle);
+  for (const Matrix54i &state : movable)
+  {
+    const Matrix54i state_simple = board_simple(state);
+    const size_t hash_value = to_hash(state_simple);
 
-        if (!isvalue_already(puzzle_index, hash_value))
-        {
-            node new_node;
-            matrix_index.push_back(state);
-            count_matrix++;
-            make_newnode(count_matrix, i, new_node, now);
-            edges[state_simple] = new_node;
-            puzzle_index.insert(hash_value);
-            puzzle_list.push(state);
-
-            if (clear(state))
-            {
-                clear_nodes.push_back(new_node);
-
-            }
-        }
-        else
-        {
-            node already = edges.at(state_simple);
-            already.side_node.push_back(now);
-        }
+    if (puzzle_index.find(hash_value) != puzzle_index.end()) {
+      edges.at(hash_value).side_node.push_back(now);
+      continue;
     }
+
+    matrix_index.push_back(state);
+    const Node new_node{matrix_index.size() - 1, i, std::vector<Node>{now}};
+    edges[hash_value] = new_node;
+    puzzle_index.insert(hash_value);
+    puzzle_list.push(state);
+
+    if (clear(state))
+    {
+      clear_nodes.push_back(new_node);
+    }
+  }
 }
 
-std::vector<std::vector<node>> breadth_first_search_dikstr(const Matrix54i &puzzle, std::vector<Matrix54i> &matrix_index)
-{
-    // sengen
-    node_index edges;
-    comparative_index puzzle_index;
-    std::queue<Matrix54i> puzzle_list;
-    std::vector<node> clear_nodes;
-    std::vector<std::vector<node>> clear_routes;
-    node first_node;
-    // dequeに初期盤面を追加
-    puzzle_list.push(puzzle);
-    // puzzleを複製
-    // puzzleを比較するための形にする
-    Matrix54i simple_puzzle = board_simple(puzzle);
-    // string型に変換する
-    std::string str = mat_to_str(simple_puzzle);
-
-    // nodeの設定を行う
-    int count_matrix = 0;
-    matrix_index.push_back(puzzle);
-    first_node.puzzle = count_matrix;
-    first_node.cost = 0;
-    edges[simple_puzzle] = first_node;
-    std::hash<std::string> hash_fn;
-    size_t str_val = hash_fn(str);
-    puzzle_index.insert(str_val);
-    int i = 0;
-
-    while (!puzzle_list.empty())
-    {
-
-        const Matrix54i now_puzzle = puzzle_list.front();
-        puzzle_list.pop();
-        std::vector<Matrix54i> movable = moved_board_list(now_puzzle);
-        i++;
-        dikstrqueue(count_matrix, i, now_puzzle, movable,
-                    puzzle_index, edges, clear_nodes, puzzle_list ,matrix_index);
-    }
-
-
-    for(node &clear_node : clear_nodes){
-        std::vector<node> route;
-        while (clear_node.cost > 0)
-        {
-            route.push_back(clear_node);
-            clear_node = dikstr(clear_node);
-        }
-        clear_routes.push_back(route);
-    }
-
-    std::vector<node> s = shortestroute_find_dikstr(clear_routes);
-    std::cout << "総手数は" << puzzle_index.size() << "手です" << std::endl;
-    std::cout << "クリアルートは" << s.size() << "手です" << std::endl;
-
-    return clear_routes;
-}
-
-node dikstr(node &now_node)
+Node find_min_cost_edge(Node &now_node)
 {
     // 最も小さいノードを定義
-    node min_node;
-    int min = -1;
+    Node min_node;
+    int min_cost = -1;
 
-    for (node n : now_node.side_node)
-    {
-        if (min == -1)
-        {
+    bool is_first = true;
+    for (const Node & n : now_node.side_node) {
+        if (is_first) {
             min_node = n;
-            min = min_node.cost;
+            min_cost = min_node.cost;
+            is_first = true;
+            continue;
         }
-        if (min > n.cost)
-        {
+        if (n.cost < min_cost) {
             min_node = n;
-            min = min_node.cost;
+            min_cost = min_node.cost;
         }
     }
 
     return min_node;
 }
 
-std::vector<node> shortestroute_find_dikstr(const std::vector<std::vector<node>> &c_route)
-{
-    std::vector<node> shortest_vec;
-    bool isFirst = true;
-    for (std::vector<node> v : c_route)
-    {
-        if (isFirst || v.size() < shortest_vec.size())
-        {
-            shortest_vec = v;
-            isFirst = false;
-        }
+std::vector<Node> find_clear_route(const Node & clear_node) {
+    std::vector<Node> route;
+    Node n = clear_node;
+    while (n.cost > 0) {
+        route.push_back(n);
+        n = find_min_cost_edge(n);
     }
-    return shortest_vec;
+    return route;
+}
+
+std::vector<Node> shortestroute_find_dikstr(const std::vector<Node> & clear_nodes)
+{
+  bool is_first = true;
+  std::vector<Node> shortest_route;
+  for(const Node & clear_node : clear_nodes) {
+    const std::vector<Node> route = find_clear_route(clear_node);
+    if (is_first) {
+      is_first = false;
+      shortest_route = route;
+      continue;
+    }
+    if (route.size() < shortest_route.size()) {
+      shortest_route = route;
+    }
+  }
+  return shortest_route;
+}
+
+std::vector<Node> breadth_first_search_dikstr(const Matrix54i &puzzle, std::vector<Matrix54i> &matrix_index)
+{
+    HashNodeMap edges;
+    comparative_index puzzle_index;
+    std::queue<Matrix54i> puzzle_list;
+    std::vector<Node> clear_nodes;
+    // dequeに初期盤面を追加
+    puzzle_list.push(puzzle);
+    // puzzleを複製
+    // puzzleを比較するための形にする
+    const Matrix54i simple_puzzle = board_simple(puzzle);
+
+    matrix_index.push_back(puzzle);
+    const size_t hash = to_hash(simple_puzzle);
+    edges[hash] = Node{matrix_index.size() - 1, 0, std::vector<Node>{}};
+    puzzle_index.insert(hash);
+
+    int i = 0;
+    while (!puzzle_list.empty())
+    {
+        const Matrix54i now_puzzle = puzzle_list.front();
+        puzzle_list.pop();
+        std::vector<Matrix54i> movable = moved_board_list(now_puzzle);
+        i++;
+        dikstrqueue(i, now_puzzle, movable,
+                    puzzle_index, edges, clear_nodes, puzzle_list, matrix_index);
+    }
+
+    const std::vector<Node> s = shortestroute_find_dikstr(clear_nodes);
+    std::cout << "総手数は" << puzzle_index.size() << "手です" << std::endl;
+    std::cout << "クリアルートは" << s.size() << "手です" << std::endl;
+    return s;
 }
