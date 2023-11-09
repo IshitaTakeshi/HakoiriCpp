@@ -29,37 +29,6 @@ size_t hash_simplified_board(const Matrix54i & board) {
   return to_hash(board_simple(board));
 }
 
-void dikstrqueue(
-    const int i,
-    const Matrix54i & now_puzzle,
-    std::unordered_set<size_t> & simplified_board_hashes,
-    HashNodeMap &hash_node_map,
-    std::vector<Node> &clear_nodes,
-    std::queue<Matrix54i> &puzzle_list)
-{
-  const Node now = hash_node_map.at(hash_simplified_board(now_puzzle));
-
-  for (const Matrix54i &board : moved_board_list(now_puzzle)) {
-    const size_t hash_value = hash_simplified_board(board);
-
-    if (simplified_board_hashes.find(hash_value) != simplified_board_hashes.end()) {
-      // TODO compare cost and overwrite if it is less than existing
-      hash_node_map.at(hash_value).side_node.push_back(now);
-      continue;
-    }
-
-    const Node new_node{board, i, std::vector<Node>{now}};
-    hash_node_map[hash_value] = new_node;
-
-    simplified_board_hashes.insert(hash_value);
-    puzzle_list.push(board);
-
-    if (clear(board)) {
-      clear_nodes.push_back(new_node);
-    }
-  }
-}
-
 Node find_min_cost_edge(Node &now_node)
 {
     // 最も小さいノードを定義
@@ -116,7 +85,7 @@ std::vector<Node> breadth_first_search_dikstr(const Matrix54i &puzzle)
     HashNodeMap hash_node_map;
     std::unordered_set<size_t> simplified_board_hashes;
     std::queue<Matrix54i> puzzle_list;
-    std::vector<Node> clear_nodes;
+    std::vector<size_t> clear_node_hashes;
 
     puzzle_list.push(puzzle);
 
@@ -126,15 +95,38 @@ std::vector<Node> breadth_first_search_dikstr(const Matrix54i &puzzle)
     simplified_board_hashes.insert(hash);
 
     int i = 0;
-    while (!puzzle_list.empty())
-    {
-        const Matrix54i now_puzzle = puzzle_list.front();
-        puzzle_list.pop();
-        i++;
-        dikstrqueue(i, now_puzzle,
-                    simplified_board_hashes, hash_node_map, clear_nodes, puzzle_list);
+    while (!puzzle_list.empty()) {
+      i++;
+
+      const Matrix54i now_puzzle = puzzle_list.front();
+      puzzle_list.pop();
+      const Node now = hash_node_map.at(hash_simplified_board(now_puzzle));
+
+      for (const Matrix54i &board : moved_board_list(now_puzzle)) {
+        const size_t hash = hash_simplified_board(board);
+
+        if (simplified_board_hashes.find(hash) != simplified_board_hashes.end()) {
+          // TODO compare cost and overwrite if it is less than existing
+          hash_node_map.at(hash).side_node.push_back(now);
+          continue;
+        }
+
+        const Node new_node{board, i, std::vector<Node>{now}};
+        hash_node_map[hash] = new_node;
+
+        simplified_board_hashes.insert(hash);
+        puzzle_list.push(board);
+
+        if (clear(board)) {
+          clear_node_hashes.push_back(hash);
+        }
+      }
     }
 
+    std::vector<Node> clear_nodes;
+    for (const size_t hash : clear_node_hashes) {
+      clear_nodes.push_back(hash_node_map.at(hash));
+    }
     const std::vector<Node> s = shortestroute_find_dikstr(clear_nodes);
     std::cout << "総手数は" << simplified_board_hashes.size() << "手です" << std::endl;
     std::cout << "クリアルートは" << s.size() << "手です" << std::endl;
